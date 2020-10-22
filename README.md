@@ -16,7 +16,7 @@
 ### 启动服务
 ```sh
 ./gohs-ladon --filepath=patterns/pattern2.txt
-[2017-12-20T06:50:50Z] Hs-service 0.0.1 Running on 0.0.0.0:8080
+Hs-service 0.0.1 Running on 0.0.0.0:8080
 ```
 ### 通过服务查询
 ```
