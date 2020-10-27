@@ -4,10 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/flier/gohs/hyperscan"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"io"
 	"net"
 	"net/http"
@@ -16,6 +12,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/flier/gohs/hyperscan"
+	"github.com/fsnotify/fsnotify"
+	"github.com/howeyc/fsnotify"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // with sync for resource lock
@@ -75,8 +78,54 @@ func main() {
 	viper.BindPFlag("filepath", rootCmd.Flags().Lookup("filepath"))
 	viper.BindPFlag("flag", rootCmd.Flags().Lookup("flag"))
 
-	rootCmd.Execute()
+	go rootCmd.Execute()
+	//==============文件监控
+	M, err := NewMonitor()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	M.Do()
+	M.watch.Watch("/home/jumpserver/xiaocf/gohs-ladon/pattern/")
+	select {}
+	log.Println("=======start monitor regexfile=====")
 }
+
+//文件监控=====
+func NewMonitor() (monitor, error) {
+	Mon, err := fsnotify.NewWatcher()
+	return monitor{Mon}, err
+}
+func (self monitor) Do() {
+	go func() {
+		for {
+			select {
+			case w := <-self.watch.Event:
+				log.Println(w)
+				if w.IsModify() {
+					log.Println("文件有改动.")
+					FilePath = viper.GetString("filepath")
+					buildScratch(FilePath)
+					continue
+				}
+				if w.IsDelete() {
+					log.Println("文件被删除.")
+					continue
+				}
+				if w.IsRename() {
+					w = <-self.watch.Event
+					log.Println(w)
+					self.watch.RemoveWatch(w.Name)
+					log.Println(w.Name, " 被重命名.")
+				}
+			case err := <-self.watch.Error:
+				log.Fatalln(err)
+			}
+		}
+	}()
+}
+
+//==================================end==================================
 
 func run(cmd *cobra.Command, args []string) {
 	// Todo add a goroutine to check if pattern file changed, and reload file.
